@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+*.log
+
+# Environment — NEVER commit real secrets
+.env
+.env.local
+.env.production
+.env.development
+# BUT .env.example IS committed (it’s a template, not a secret)

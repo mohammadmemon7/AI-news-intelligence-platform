@@ -1,0 +1,143 @@
+import axios from 'axios';
+import crypto from 'crypto';
+import { env } from '../../config/env';
+import { Article } from '../articles/article.model';
+import { aiService } from '../../services/ai.service';
+import { logger } from '../../utils/logger';
+
+export const pipelineService = {
+  run: async () => {
+    logger.info('Starting news intelligence pipeline...');
+    
+    let articlesFetched = 0;
+    let nextPage: string | null = null;
+    const targetCount = 50; 
+    
+    try {
+      do {
+        // 1. Fetch from NewsData.io
+        const response = await axios.get('https://newsdata.io/api/1/news', {
+          params: {
+            apikey: env.NEWS_API_KEY,
+            language: 'en',
+            page: nextPage,
+          }
+        });
+
+        const { results, nextPage: next } = response.data;
+        nextPage = next;
+
+        if (!results || results.length === 0) break;
+
+        for (const rawArticle of results) {
+          if (!rawArticle.title || (!rawArticle.content && !rawArticle.description)) continue;
+
+          // Fix 3: Add language filter — keep only English articles
+          if (rawArticle.language && rawArticle.language !== 'english') {
+            continue; 
+          }
+
+          const title = rawArticle.title.trim();
+          const pubDate = rawArticle.pubDate || new Date().toISOString();
+          
+          const dedup_hash = crypto
+            .createHash('md5')
+            .update(`${title}|${pubDate}`)
+            .digest('hex');
+
+          const existing = await Article.findOne({ dedup_hash });
+          if (existing) continue;
+
+          const cleanText = (text: string) => text.replace(/<[^>]*>?/gm, '').trim();
+          
+          const description = rawArticle.description ? cleanText(rawArticle.description) : '';
+          const content = rawArticle.content ? cleanText(rawArticle.content) : description;
+
+          await Article.create({
+            title,
+            description,
+            content,
+            source_url: rawArticle.link,
+            source_name: rawArticle.source_id,
+            published_at: new Date(pubDate),
+            category: rawArticle.category || [],
+            country: rawArticle.country || [],
+            language: rawArticle.language || 'english',
+            dedup_hash,
+            ai_processed: false,
+          });
+
+          articlesFetched++;
+        }
+
+        if (nextPage) await new Promise(resolve => setTimeout(resolve, 1000));
+
+      } while (nextPage && articlesFetched < targetCount);
+
+      logger.info(`Fetched and stored ${articlesFetched} new articles. Starting AI processing...`);
+
+      // 5. AI Processing
+      await pipelineService.processAllUnprocessed();
+
+      logger.info('Pipeline completed successfully.');
+      return { articlesFetched };
+      
+    } catch (error) {
+      logger.error('Pipeline Error:', error instanceof Error ? error.message : error);
+      throw error;
+    }
+  },
+
+  processAllUnprocessed: async () => {
+    // Fix 2: Batch Processing (Batch of 5 with 500ms delay between batches)
+    const batchSize = 5;
+    const delayBetweenBatches = 500;
+
+    let unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
+
+    while (unprocessed.length > 0) {
+      logger.info(`Processing batch of ${unprocessed.length} articles with AI...`);
+
+      // Inside batch, we process sequentially (one by one) as per rules
+      for (const article of unprocessed) {
+        logger.info(`Processing article ${article._id} inside batch...`);
+        
+        let success = false;
+        let attempts = 0;
+        
+        while (!success && attempts < 1) { // 1 attempt initially, 429 retry logic handled below
+            try {
+              const textToAnalyze = `${article.title}\n\n${article.description || article.content}`;
+              const analysis = await aiService.processArticle(textToAnalyze);
+              
+              article.ai_summary = analysis.summary;
+              article.ai_sentiment = analysis.sentiment;
+              article.ai_insights = analysis.insights;
+              article.ai_processed = true;
+              article.ai_failed = false;
+              success = true;
+            } catch (err: any) {
+              if (err.message === 'RATE_LIMIT') {
+                logger.warn('Groq Rate Limit hit. Waiting 5 seconds before retry...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                // Retry same article
+                continue; 
+              }
+
+              logger.error(`AI Enrichment Failed for article ${article._id}:`, err);
+              article.ai_failed = true;
+              article.ai_processed = true; 
+              success = true; // exit loop
+            }
+        }
+        await article.save();
+      }
+
+      // After all 5 articles in a batch are processed, add a 500ms delay
+      await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+
+      // Fetch next batch
+      unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
+    }
+  }
+};
