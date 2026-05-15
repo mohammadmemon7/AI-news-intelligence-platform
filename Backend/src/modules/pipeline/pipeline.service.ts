@@ -8,12 +8,15 @@ import { logger } from '../../utils/logger';
 let isRunning = false;
 let lastRun: Date | null = null;
 let processedCount = 0;
+let totalToProcess = 0;
 
 export const pipelineService = {
   run: async () => {
     if (isRunning) {
         logger.warn('Pipeline is already running.');
-        return { message: 'Already running' };
+        // If it's been running for more than 10 minutes, something might be wrong.
+        // We'll allow a reset if it's clearly stuck, but for now we just return.
+        return { message: 'Already running', isRunning, processedCount };
     }
 
     isRunning = true;
@@ -24,12 +27,12 @@ export const pipelineService = {
     
     let articlesFetched = 0;
     let nextPage: string | null = null;
-    const targetCount = 200; 
+    const targetCount = 100; // Reduced from 200 for faster cycles
     
     try {
+      // 1. Fetching Phase
       do {
-        // 1. Fetch from NewsData.io
-        logger.info(`Using News API key: ${env!.NEWS_API_KEY.slice(0, 8)}...`);
+        logger.info(`Fetching articles... (Current count: ${articlesFetched})`);
         const apiResponse: any = await axios.get('https://newsdata.io/api/1/news', {
           params: {
             apikey: env!.NEWS_API_KEY,
@@ -46,10 +49,7 @@ export const pipelineService = {
         for (const rawArticle of results) {
           if (!rawArticle.title || (!rawArticle.content && !rawArticle.description)) continue;
 
-          // Fix 3: Add language filter — keep only English articles
-          if (rawArticle.language && rawArticle.language !== 'english') {
-            continue; 
-          }
+          if (rawArticle.language && rawArticle.language !== 'english') continue; 
 
           const title = rawArticle.title.trim();
           const pubDate = rawArticle.pubDate || new Date().toISOString();
@@ -63,7 +63,6 @@ export const pipelineService = {
           if (existing) continue;
 
           const cleanText = (text: string) => text.replace(/<[^>]*>?/gm, '').trim();
-          
           const description = rawArticle.description ? cleanText(rawArticle.description) : '';
           const content = rawArticle.content ? cleanText(rawArticle.content) : description;
 
@@ -88,94 +87,90 @@ export const pipelineService = {
 
       } while (nextPage && articlesFetched < targetCount);
 
-      logger.info(`Fetched and stored ${articlesFetched} new articles. Starting AI processing...`);
-
-      // 5. AI Processing
+      // 2. Processing Phase
+      logger.info(`Fetched ${articlesFetched} articles. Starting enrichment...`);
       await pipelineService.processAllUnprocessed();
 
-      logger.info('Pipeline completed successfully.');
-      return { articlesFetched };
+      logger.info('Pipeline execution finished.');
+      return { articlesFetched, processedCount };
       
     } catch (error) {
       logger.error('Pipeline Error:', error instanceof Error ? error.message : error);
-      throw error;
+      // We don't throw here to ensure isRunning = false is reached in finally
     } finally {
         isRunning = false;
     }
   },
 
   processAllUnprocessed: async () => {
-    // Fix 2: Batch Processing (Batch of 5 with 500ms delay between batches)
-    const batchSize = 5;
-    const delayBetweenBatches = 500;
+    const batchSize = 10; // Increased batch size
+    const delayBetweenBatches = 1000;
 
-    // Fix: Only query for articles that are NOT processed and haven't FAILED yet in this run.
-    // However, to be robust, we mark them as processed even on failure so we don't loop forever.
+    // Find all that need processing
+    const allUnprocessed = await Article.find({ ai_processed: false }).select('_id');
+    totalToProcess = allUnprocessed.length;
+    
+    logger.info(`Found ${totalToProcess} articles requiring AI analysis.`);
+
     let unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
 
     while (unprocessed.length > 0) {
-      logger.info(`Processing batch of ${unprocessed.length} articles with AI...`);
+      logger.info(`Processing batch of ${unprocessed.length} articles... (${processedCount}/${totalToProcess})`);
 
-      for (const article of unprocessed) {
-        await pipelineService.enrichArticle(article);
-        processedCount++;
-      }
+      // Process in parallel within the batch to speed up, but still manageable
+      await Promise.all(unprocessed.map(article => pipelineService.enrichArticle(article)));
+      
+      processedCount += unprocessed.length;
 
+      // Rate limit protection
       await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+      
       unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
     }
   },
 
   enrichArticle: async (article: any) => {
-    logger.info(`Enriching article ${article._id} with AI...`);
-    
-    let success = false;
-    let attempts = 0;
-    
-    while (!success && attempts < 2) {
-        try {
-          const textToAnalyze = `${article.title}\n\n${article.description || article.content}`;
-          const analysis = await aiService.processArticle(textToAnalyze);
-          
-          article.ai_summary = analysis.summary;
-          article.ai_sentiment = analysis.sentiment;
-          article.ai_impact_score = analysis.impact_score;
-          article.ai_insights = analysis.insights;
+    try {
+      const textToAnalyze = `${article.title}\n\n${article.description || article.content || ''}`;
+      // Basic validation: if text is too short, mark as failed immediately
+      if (textToAnalyze.trim().length < 50) {
           article.ai_processed = true;
-          article.ai_failed = false;
-          success = true;
-        } catch (err: any) {
-          attempts++;
-          if (err.message === 'RATE_LIMIT') {
-            logger.warn('Groq Rate Limit hit. Waiting 5 seconds before retry...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            continue; 
-          }
-
-          logger.error(`AI Enrichment Failed for article ${article._id}:`, err);
           article.ai_failed = true;
-          article.ai_processed = true; // Mark as processed so we don't keep retrying in the loop
-          success = true; 
-        }
+          await article.save();
+          return;
+      }
+
+      const analysis = await aiService.processArticle(textToAnalyze);
+      
+      article.ai_summary = analysis.summary;
+      article.ai_sentiment = analysis.sentiment;
+      article.ai_impact_score = analysis.impact_score;
+      article.ai_insights = analysis.insights;
+      article.ai_processed = true;
+      article.ai_failed = false;
+    } catch (err: any) {
+      logger.error(`Enrichment failed for ${article._id}:`, err.message);
+      article.ai_failed = true;
+      article.ai_processed = true; 
     }
     await article.save();
-    return article;
   },
 
   processSingleArticle: async (id: string) => {
     const article = await Article.findById(id);
     if (!article) throw new Error('Article not found');
     
-    // For single processing, we ALWAYS try again even if it failed before
     article.ai_failed = false;
     article.ai_processed = false;
     
-    return await pipelineService.enrichArticle(article);
+    await pipelineService.enrichArticle(article);
+    return await Article.findById(id); // Reload to get updated fields
   },
 
   getStatus: () => ({
     isRunning,
     lastRun,
-    processedCount
+    processedCount,
+    totalToProcess
   })
 };

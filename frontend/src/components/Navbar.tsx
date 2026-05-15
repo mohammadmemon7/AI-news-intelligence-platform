@@ -11,14 +11,14 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onRefresh, isRefreshing, isDark, toggleTheme }) => {
-  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineStatus, setPipelineStatus] = useState<{ isRunning: boolean; processedCount: number; totalToProcess: number } | null>(null);
 
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const res = await getPipelineStatus();
         if (res.success) {
-          setPipelineRunning(res.data.isRunning);
+          setPipelineStatus(res.data);
         }
       } catch (err) {
         // Silently fail for status check
@@ -26,7 +26,7 @@ const Navbar: React.FC<NavbarProps> = ({ onRefresh, isRefreshing, isDark, toggle
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 10000); // Check every 10s
+    const interval = setInterval(checkStatus, 5000); // Check every 5s
     return () => clearInterval(interval);
   }, []);
 
@@ -44,10 +44,12 @@ const Navbar: React.FC<NavbarProps> = ({ onRefresh, isRefreshing, isDark, toggle
               </span>
             </Link>
 
-            {pipelineRunning && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold animate-pulse">
+            {pipelineStatus?.isRunning && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-black animate-pulse uppercase tracking-widest border border-blue-100 dark:border-blue-800">
                 <Activity size={12} />
-                <span className="hidden sm:inline">PIPELINE ACTIVE</span>
+                <span>
+                  ANALYZING: {pipelineStatus.processedCount} / {pipelineStatus.totalToProcess || '...'}
+                </span>
               </div>
             )}
           </div>
@@ -64,11 +66,13 @@ const Navbar: React.FC<NavbarProps> = ({ onRefresh, isRefreshing, isDark, toggle
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                disabled={isRefreshing}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
+                disabled={isRefreshing || pipelineStatus?.isRunning}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
               >
-                <RefreshCw size={16} className={`${isRefreshing ? 'animate-spin text-blue-600' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                <span className="hidden sm:inline">Refresh Feed</span>
+                <RefreshCw size={16} className={`${isRefreshing || pipelineStatus?.isRunning ? 'animate-spin text-blue-600' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                <span className="hidden sm:inline">
+                  {pipelineStatus?.isRunning ? 'Analyzing...' : (isRefreshing ? 'Fetching...' : 'Refresh Feed')}
+                </span>
               </button>
             )}
           </div>
