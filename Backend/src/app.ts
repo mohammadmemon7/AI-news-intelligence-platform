@@ -36,7 +36,10 @@ const sanitizeMiddleware = (req: express.Request, res: express.Response, next: e
 
 // Health check mounted before global rate limiter
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ 
+    status: 'ok',
+    secret_hint: env!.PIPELINE_SECRET ? `${env!.PIPELINE_SECRET.slice(0, 3)}...` : 'missing'
+  });
 });
 
 // 1. Helmet – security headers
