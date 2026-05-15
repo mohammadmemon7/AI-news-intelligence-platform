@@ -44,7 +44,7 @@ app.use(helmet());
 
 // 2. CORS – explicit origin
 app.use(cors({
-  origin: env.CLIENT_URL,
+  origin: env!.CLIENT_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 
@@ -61,7 +61,7 @@ app.get('/api/pipeline/status', pipelineController.getStatus);
 app.post('/api/pipeline/process/:id', pipelineController.processArticle);
 
 // 6. Logging
-if (env.NODE_ENV === 'development') {
+if (env!.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 

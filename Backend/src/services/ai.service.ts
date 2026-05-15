@@ -16,9 +16,9 @@ export const aiService = {
       const truncatedText = text.slice(0, 800);
 
       const response = await axios.post(
-        `${env.GROQ_BASE_URL}/chat/completions`,
+        `${env!.GROQ_BASE_URL}/chat/completions`,
         {
-          model: env.GROQ_MODEL,
+          model: env!.GROQ_MODEL,
           messages: [
             {
               role: 'user',
@@ -40,7 +40,7 @@ JSON Structure:
         },
         {
           headers: {
-            Authorization: `Bearer ${env.GROQ_API_KEY}`,
+            Authorization: `Bearer ${env!.GROQ_API_KEY}`,
             'Content-Type': 'application/json',
           },
         }

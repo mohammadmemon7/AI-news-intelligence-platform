@@ -13,9 +13,9 @@ const startServer = async () => {
     cronService.init(false);
 
     // 3. Start Listening
-    app.listen(env.PORT, () => {
-      logger.info(`🚀 Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);
-      logger.info(`Health check: http://localhost:${env.PORT}/health`);
+    app.listen(env!.PORT, () => {
+      logger.info(`🚀 Server running in ${env!.NODE_ENV} mode on port ${env!.PORT}`);
+      logger.info(`Health check: http://localhost:${env!.PORT}/health`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

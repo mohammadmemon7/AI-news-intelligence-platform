@@ -7,7 +7,7 @@ export const runPipeline = async (req: Request, res: Response, next: NextFunctio
   try {
     const secret = req.headers['x-pipeline-secret'];
     
-    if (secret !== env.PIPELINE_SECRET) {
+    if (secret !== env!.PIPELINE_SECRET) {
       logger.warn(`Unauthorized pipeline trigger attempt from IP: ${req.ip}`);
       return res.status(401).json({
         success: false,
@@ -36,7 +36,7 @@ export const runPipeline = async (req: Request, res: Response, next: NextFunctio
 export const processArticle = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const secret = req.headers['x-pipeline-secret'];
-    if (!secret || secret !== env.PIPELINE_SECRET) {
+    if (!secret || secret !== env!.PIPELINE_SECRET) {
       return res.status(401).json({
         success: false,
         error: {

@@ -29,10 +29,10 @@ export const pipelineService = {
     try {
       do {
         // 1. Fetch from NewsData.io
-        logger.info(`Using News API key: ${env.NEWS_API_KEY.slice(0, 8)}...`);
+        logger.info(`Using News API key: ${env!.NEWS_API_KEY.slice(0, 8)}...`);
         const apiResponse: any = await axios.get('https://newsdata.io/api/1/news', {
           params: {
-            apikey: env.NEWS_API_KEY,
+            apikey: env!.NEWS_API_KEY,
             language: 'en',
             page: nextPage,
           }
