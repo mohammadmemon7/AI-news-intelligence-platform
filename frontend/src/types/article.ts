@@ -13,6 +13,7 @@ export interface Article {
   ai_impact_score?: number;
   ai_insights?: string[];
   ai_processed: boolean;
+  ai_failed?: boolean;
   fetched_at: string;
 }
 
