@@ -109,21 +109,19 @@ export const pipelineService = {
     const batchSize = 5;
     const delayBetweenBatches = 500;
 
+    // Fix: Only query for articles that are NOT processed and haven't FAILED yet in this run.
+    // However, to be robust, we mark them as processed even on failure so we don't loop forever.
     let unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
 
     while (unprocessed.length > 0) {
       logger.info(`Processing batch of ${unprocessed.length} articles with AI...`);
 
-      // Inside batch, we process sequentially (one by one) as per rules
       for (const article of unprocessed) {
         await pipelineService.enrichArticle(article);
         processedCount++;
       }
 
-      // After all 5 articles in a batch are processed, add a 500ms delay
       await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
-
-      // Fetch next batch
       unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
     }
   },
@@ -141,6 +139,7 @@ export const pipelineService = {
           
           article.ai_summary = analysis.summary;
           article.ai_sentiment = analysis.sentiment;
+          article.ai_impact_score = analysis.impact_score;
           article.ai_insights = analysis.insights;
           article.ai_processed = true;
           article.ai_failed = false;
@@ -155,9 +154,8 @@ export const pipelineService = {
 
           logger.error(`AI Enrichment Failed for article ${article._id}:`, err);
           article.ai_failed = true;
-          article.ai_processed = false;
-          // Do NOT set ai_summary/ai_sentiment/ai_insights — leave them empty
-          success = true; // exit loop
+          article.ai_processed = true; // Mark as processed so we don't keep retrying in the loop
+          success = true; 
         }
     }
     await article.save();
@@ -167,6 +165,10 @@ export const pipelineService = {
   processSingleArticle: async (id: string) => {
     const article = await Article.findById(id);
     if (!article) throw new Error('Article not found');
+    
+    // For single processing, we ALWAYS try again even if it failed before
+    article.ai_failed = false;
+    article.ai_processed = false;
     
     return await pipelineService.enrichArticle(article);
   },

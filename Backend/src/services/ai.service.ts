@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 export interface AIAnalysis {
   summary: string;
   sentiment: 'Positive' | 'Negative' | 'Neutral';
+  impact_score: number;
   insights: string[];
 }
 
@@ -32,6 +33,7 @@ JSON Structure:
 {
   "summary": "1-2 sentence summary",
   "sentiment": "Positive" | "Negative" | "Neutral",
+  "impact_score": 1-10 (Numeric),
   "insights": ["insight 1", "insight 2", "insight 3"]
 }`,
             },
@@ -49,13 +51,18 @@ JSON Structure:
       const content = response.data.choices[0].message.content;
       
       try {
-        return JSON.parse(content);
+        const parsed = JSON.parse(content);
+        // Ensure impact_score is numeric
+        if (parsed.impact_score) parsed.impact_score = Number(parsed.impact_score);
+        return parsed;
       } catch (parseError) {
         // Fallback: try to find JSON block
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
-            return JSON.parse(jsonMatch[0]);
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.impact_score) parsed.impact_score = Number(parsed.impact_score);
+            return parsed;
           } catch (innerError) {
              logger.error('Failed to parse matched JSON block:', innerError);
           }

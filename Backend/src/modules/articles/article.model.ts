@@ -13,6 +13,7 @@ export interface IArticle extends Document {
   dedup_hash: string;
   ai_summary?: string;
   ai_sentiment?: 'Positive' | 'Negative' | 'Neutral';
+  ai_impact_score?: number;
   ai_insights: string[];
   ai_processed: boolean;
   ai_failed: boolean;
@@ -32,6 +33,7 @@ const articleSchema = new Schema<IArticle>({
   dedup_hash: { type: String, required: true, unique: true },
   ai_summary: { type: String },
   ai_sentiment: { type: String, enum: ['Positive', 'Negative', 'Neutral'] },
+  ai_impact_score: { type: Number, min: 1, max: 10 },
   ai_insights: [{ type: String }],
   ai_processed: { type: Boolean, default: false },
   ai_failed: { type: Boolean, default: false },

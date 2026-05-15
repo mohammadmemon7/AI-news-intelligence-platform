@@ -146,6 +146,11 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article: initialArticle }) =>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-tighter ${getSentimentColor(article.ai_sentiment)}`}>
                   {article.ai_sentiment || 'Neutral'}
                 </span>
+                {article.ai_impact_score && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 uppercase tracking-tighter">
+                    Impact: {article.ai_impact_score}/10
+                  </span>
+                )}
                 {article.ai_sentiment === 'Positive' && <span className="text-xs">🚀</span>}
                 {article.ai_sentiment === 'Negative' && <span className="text-xs">⚠️</span>}
               </div>
