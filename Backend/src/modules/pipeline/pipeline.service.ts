@@ -119,6 +119,8 @@ export const pipelineService = {
       for (const article of unprocessed) {
         await pipelineService.enrichArticle(article);
         processedCount++;
+        // Small 500ms delay between articles in the same batch
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));

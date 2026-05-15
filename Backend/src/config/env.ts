@@ -25,7 +25,9 @@ const loadEnv = () => {
   });
 
   try {
-    return envSchema.parse(process.env);
+    const parsed = envSchema.parse(process.env);
+    console.log(`[ENV] Using AI Model: ${parsed.GROQ_MODEL}`);
+    return parsed;
   } catch (error: any) {
     console.error('❌ Invalid environment variables:', JSON.stringify(error.format ? error.format() : error, null, 2));
     process.exit(1);
