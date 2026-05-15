@@ -2,8 +2,16 @@ import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables from .env file
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Always resolve .env relative to the Backend root, regardless of cwd
+// Works for both CommonJS (ts-node-dev) and ESM
+const envPath = path.resolve(__dirname, '../../.env');
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+  // Fallback: try cwd (in case __dirname doesn't resolve as expected)
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+}
+console.log(`[ENV] Loading .env from: ${envPath}`);
+console.log(`[ENV] NEWS_API_KEY loaded: ${process.env.NEWS_API_KEY?.slice(0, 8)}...`);
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),

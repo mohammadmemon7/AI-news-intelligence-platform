@@ -57,6 +57,8 @@ app.use(sanitizeMiddleware);
 // 5. Rate Limiting
 app.use('/api', globalLimiter);
 app.post('/api/pipeline/run', pipelineLimiter, pipelineController.runPipeline);
+app.get('/api/pipeline/status', pipelineController.getStatus);
+app.post('/api/pipeline/process/:id', pipelineController.processArticle);
 
 // 6. Logging
 if (env.NODE_ENV === 'development') {

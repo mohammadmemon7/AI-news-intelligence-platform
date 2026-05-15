@@ -1,0 +1,24 @@
+# Assignment internal documents — not for reviewers
+PRD.md
+Backend rules.md
+frontend rules.md
+test.txt
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -5,7 +5,6 @@ import { logger } from '../../utils/logger';
 
 export const runPipeline = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Fix 4: Validate PIPELINE_SECRET in request header as per PRD section 5.2
     const secret = req.headers['x-pipeline-secret'];
     
     if (secret !== env.PIPELINE_SECRET) {
@@ -19,7 +18,6 @@ export const runPipeline = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    // Run pipeline asynchronously to avoid blocking the request
     pipelineService.run().catch(err => {
         logger.error('Background pipeline error:', err);
     });
@@ -29,6 +27,43 @@ export const runPipeline = async (req: Request, res: Response, next: NextFunctio
       data: {
         message: 'Pipeline started successfully in the background.',
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const processArticle = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const secret = req.headers['x-pipeline-secret'];
+    if (!secret || secret !== env.PIPELINE_SECRET) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid pipeline secret',
+        },
+      });
+    }
+
+    const { id } = req.params;
+    const article = await pipelineService.processSingleArticle(id);
+    
+    res.status(200).json({
+      success: true,
+      data: article
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = pipelineService.getStatus();
+    res.status(200).json({
+      success: true,
+      data: status
     });
   } catch (error) {
     next(error);

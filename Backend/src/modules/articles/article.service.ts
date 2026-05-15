@@ -24,7 +24,7 @@ export const articleService = {
 
     const [articles, total] = await Promise.all([
       Article.find(query)
-        .sort({ [sort_by]: -1 })
+        .sort(sort_by)
         .skip(skip)
         .limit(limit),
       Article.countDocuments(query),

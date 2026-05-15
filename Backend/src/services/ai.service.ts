@@ -8,11 +8,6 @@ export interface AIAnalysis {
   insights: string[];
 }
 
-const DEFAULT_ANALYSIS: AIAnalysis = {
-  summary: 'Analysis unavailable.',
-  sentiment: 'Neutral',
-  insights: ['Unable to generate insights at this time.'],
-};
 
 export const aiService = {
   processArticle: async (text: string): Promise<AIAnalysis> => {
@@ -72,7 +67,7 @@ JSON Structure:
         throw new Error('RATE_LIMIT'); // Specialized error for pipeline to handle
       }
       logger.error('Groq AI Processing Error:', error instanceof Error ? error.message : error);
-      return DEFAULT_ANALYSIS;
+      throw new Error('AI_PROCESSING_FAILED');
     }
   },
 };

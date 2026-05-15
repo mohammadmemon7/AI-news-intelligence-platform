@@ -5,17 +5,31 @@ import { Article } from '../articles/article.model';
 import { aiService } from '../../services/ai.service';
 import { logger } from '../../utils/logger';
 
+let isRunning = false;
+let lastRun: Date | null = null;
+let processedCount = 0;
+
 export const pipelineService = {
   run: async () => {
+    if (isRunning) {
+        logger.warn('Pipeline is already running.');
+        return { message: 'Already running' };
+    }
+
+    isRunning = true;
+    lastRun = new Date();
+    processedCount = 0;
+    
     logger.info('Starting news intelligence pipeline...');
     
     let articlesFetched = 0;
     let nextPage: string | null = null;
-    const targetCount = 50; 
+    const targetCount = 200; 
     
     try {
       do {
         // 1. Fetch from NewsData.io
+        logger.info(`Using News API key: ${env.NEWS_API_KEY.slice(0, 8)}...`);
         const response = await axios.get('https://newsdata.io/api/1/news', {
           params: {
             apikey: env.NEWS_API_KEY,
@@ -85,6 +99,8 @@ export const pipelineService = {
     } catch (error) {
       logger.error('Pipeline Error:', error instanceof Error ? error.message : error);
       throw error;
+    } finally {
+        isRunning = false;
     }
   },
 
@@ -100,37 +116,8 @@ export const pipelineService = {
 
       // Inside batch, we process sequentially (one by one) as per rules
       for (const article of unprocessed) {
-        logger.info(`Processing article ${article._id} inside batch...`);
-        
-        let success = false;
-        let attempts = 0;
-        
-        while (!success && attempts < 1) { // 1 attempt initially, 429 retry logic handled below
-            try {
-              const textToAnalyze = `${article.title}\n\n${article.description || article.content}`;
-              const analysis = await aiService.processArticle(textToAnalyze);
-              
-              article.ai_summary = analysis.summary;
-              article.ai_sentiment = analysis.sentiment;
-              article.ai_insights = analysis.insights;
-              article.ai_processed = true;
-              article.ai_failed = false;
-              success = true;
-            } catch (err: any) {
-              if (err.message === 'RATE_LIMIT') {
-                logger.warn('Groq Rate Limit hit. Waiting 5 seconds before retry...');
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                // Retry same article
-                continue; 
-              }
-
-              logger.error(`AI Enrichment Failed for article ${article._id}:`, err);
-              article.ai_failed = true;
-              article.ai_processed = true; 
-              success = true; // exit loop
-            }
-        }
-        await article.save();
+        await pipelineService.enrichArticle(article);
+        processedCount++;
       }
 
       // After all 5 articles in a batch are processed, add a 500ms delay
@@ -139,5 +126,54 @@ export const pipelineService = {
       // Fetch next batch
       unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
     }
-  }
+  },
+
+  enrichArticle: async (article: any) => {
+    logger.info(`Enriching article ${article._id} with AI...`);
+    
+    let success = false;
+    let attempts = 0;
+    
+    while (!success && attempts < 2) {
+        try {
+          const textToAnalyze = `${article.title}\n\n${article.description || article.content}`;
+          const analysis = await aiService.processArticle(textToAnalyze);
+          
+          article.ai_summary = analysis.summary;
+          article.ai_sentiment = analysis.sentiment;
+          article.ai_insights = analysis.insights;
+          article.ai_processed = true;
+          article.ai_failed = false;
+          success = true;
+        } catch (err: any) {
+          attempts++;
+          if (err.message === 'RATE_LIMIT') {
+            logger.warn('Groq Rate Limit hit. Waiting 5 seconds before retry...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            continue; 
+          }
+
+          logger.error(`AI Enrichment Failed for article ${article._id}:`, err);
+          article.ai_failed = true;
+          article.ai_processed = false;
+          // Do NOT set ai_summary/ai_sentiment/ai_insights — leave them empty
+          success = true; // exit loop
+        }
+    }
+    await article.save();
+    return article;
+  },
+
+  processSingleArticle: async (id: string) => {
+    const article = await Article.findById(id);
+    if (!article) throw new Error('Article not found');
+    
+    return await pipelineService.enrichArticle(article);
+  },
+
+  getStatus: () => ({
+    isRunning,
+    lastRun,
+    processedCount
+  })
 };
