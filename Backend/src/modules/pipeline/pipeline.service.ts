@@ -148,10 +148,12 @@ export const pipelineService = {
       article.ai_insights = analysis.insights;
       article.ai_processed = true;
       article.ai_failed = false;
+      article.ai_error_message = undefined;
     } catch (err: any) {
       logger.error(`Enrichment failed for ${article._id}:`, err.message);
       article.ai_failed = true;
       article.ai_processed = true; 
+      article.ai_error_message = err.message;
     }
     await article.save();
   },

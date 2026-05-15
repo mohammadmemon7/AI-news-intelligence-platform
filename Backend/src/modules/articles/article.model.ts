@@ -17,6 +17,7 @@ export interface IArticle extends Document {
   ai_insights: string[];
   ai_processed: boolean;
   ai_failed: boolean;
+  ai_error_message?: string;
   fetched_at: Date;
 }
 
@@ -37,6 +38,7 @@ const articleSchema = new Schema<IArticle>({
   ai_insights: [{ type: String }],
   ai_processed: { type: Boolean, default: false },
   ai_failed: { type: Boolean, default: false },
+  ai_error_message: { type: String },
   fetched_at: { type: Date, default: Date.now },
 });
 

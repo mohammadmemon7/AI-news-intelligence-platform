@@ -242,7 +242,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article: initialArticle }) =>
                   {article.ai_failed ? 'AI Analysis Failed' : 'AI Analysis Pending'}
                 </p>
                 <p className={`text-[11px] ${article.ai_failed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500'}`}>
-                  {article.ai_failed ? 'Click below to try again.' : 'Insights will be available shortly.'}
+                  {article.ai_failed ? (article.ai_error_message || 'Click below to try again.') : 'Insights will be available shortly.'}
                 </p>
               </div>
               <button
