@@ -47,7 +47,7 @@ export const processArticle = async (req: Request, res: Response, next: NextFunc
     }
 
     const { id } = req.params;
-    const article = await pipelineService.processSingleArticle(id);
+    const article = await pipelineService.processSingleArticle(id as string);
     
     res.status(200).json({
       success: true,
