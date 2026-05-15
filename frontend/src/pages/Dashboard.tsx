@@ -79,30 +79,34 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      await runPipeline(); // sends POST /api/pipeline/run → gets 202 Accepted
+      setError(null);
+      const res = await runPipeline(); 
+      if (!res.success) {
+          throw new Error(res.message || 'Failed to start pipeline');
+      }
 
-      // Poll /api/pipeline/status every 3s until the pipeline finishes,
-      // then refetch articles and stats so the UI shows genuinely new data.
+      // Poll /api/pipeline/status every 3s
       const pollUntilDone = async () => {
-        const MAX_POLLS = 60; // give up after 3 minutes
+        const MAX_POLLS = 100; 
         let polls = 0;
         while (polls < MAX_POLLS) {
           await new Promise(resolve => setTimeout(resolve, 3000));
           try {
             const status = await getPipelineStatus();
-            if (!status.data?.isRunning) break; // pipeline finished
-          } catch { break; } // if status endpoint fails, proceed anyway
+            if (!status.data?.isRunning) break;
+          } catch { break; }
           polls++;
         }
-        // Refetch only after pipeline is done (or timed out)
         fetchArticles();
         fetchStats();
         setRefreshing(false);
       };
 
-      pollUntilDone(); // run in background — don't await so UI stays responsive
-    } catch (err) {
+      pollUntilDone();
+    } catch (err: any) {
       console.error('Pipeline error:', err);
+      const msg = err.response?.data?.error?.message || err.message || 'Pipeline failed to start.';
+      setError(`Pipeline Error: ${msg}. Check if your PIPELINE_SECRET is correct on both Render and Vercel.`);
       setRefreshing(false);
     }
   };

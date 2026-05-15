@@ -6,9 +6,10 @@ import { logger } from '../../utils/logger';
 export const runPipeline = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const secret = req.headers['x-pipeline-secret'];
+    const expectedSecret = env!.PIPELINE_SECRET;
     
-    if (secret !== env!.PIPELINE_SECRET) {
-      logger.warn(`Unauthorized pipeline trigger attempt from IP: ${req.ip}`);
+    if (secret !== expectedSecret) {
+      logger.warn(`Unauthorized pipeline trigger attempt from IP: ${req.ip}. Expected start: ${expectedSecret.slice(0, 3)}...`);
       return res.status(401).json({
         success: false,
         error: {
@@ -36,7 +37,10 @@ export const runPipeline = async (req: Request, res: Response, next: NextFunctio
 export const processArticle = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const secret = req.headers['x-pipeline-secret'];
-    if (!secret || secret !== env!.PIPELINE_SECRET) {
+    const expectedSecret = env!.PIPELINE_SECRET;
+
+    if (!secret || secret !== expectedSecret) {
+      logger.warn(`Pipeline trigger denied: Secret mismatch. Expected start: ${expectedSecret.slice(0, 3)}...`);
       return res.status(401).json({
         success: false,
         error: {
