@@ -13,8 +13,8 @@ export interface AIAnalysis {
 export const aiService = {
   processArticle: async (text: string): Promise<AIAnalysis> => {
     try {
-      // Truncate content to 800 chars as per rules section 8
-      const truncatedText = text.slice(0, 800);
+      // Truncate content to 1000 chars for better context while staying within limits
+      const truncatedText = text.slice(0, 1000);
 
       const response = await axios.post(
         `${env!.GROQ_BASE_URL}/chat/completions`,
@@ -22,23 +22,37 @@ export const aiService = {
           model: env!.GROQ_MODEL,
           messages: [
             {
+              role: 'system',
+              content: `You are a professional news intelligence analyst. Your task is to provide objective, high-quality analysis of news articles.
+Return ONLY a valid JSON object. No conversational text.`
+            },
+            {
               role: 'user',
-              content: `Analyze this article and return ONLY a JSON object. 
-Do not include any conversational text before or after the JSON.
+              content: `Analyze the following news article:
 
-Article:
-${truncatedText}
+ARTICLE TEXT:
+"${truncatedText}"
 
-JSON Structure:
+TASKS:
+1. Provide a concise 1-2 sentence summary.
+2. Determine sentiment: 
+   - "Positive": Good news, breakthrough, recovery, or uplifting events.
+   - "Negative": Crisis, disaster, crime, death, or economic downturn.
+   - "Neutral": Facts, announcements, or balanced reporting.
+3. Assign an Impact Score (1-10) based on global or regional significance.
+4. Extract 3 key bullet-point insights.
+
+JSON STRUCTURE:
 {
-  "summary": "1-2 sentence summary",
+  "summary": "string",
   "sentiment": "Positive" | "Negative" | "Neutral",
-  "impact_score": 1-10 (Numeric),
-  "insights": ["insight 1", "insight 2", "insight 3"]
-}`,
+  "impact_score": number,
+  "insights": ["string", "string", "string"]
+}`
             },
           ],
           temperature: 0.1,
+          response_format: { type: "json_object" } // Groq supports this for better JSON
         },
         {
           headers: {
@@ -52,8 +66,20 @@ JSON Structure:
       
       try {
         const parsed = JSON.parse(content);
+        
+        // Normalize Sentiment to PascalCase
+        if (parsed.sentiment) {
+            const s = parsed.sentiment.toLowerCase();
+            if (s.includes('pos')) parsed.sentiment = 'Positive';
+            else if (s.includes('neg')) parsed.sentiment = 'Negative';
+            else parsed.sentiment = 'Neutral';
+        } else {
+            parsed.sentiment = 'Neutral';
+        }
+
         // Ensure impact_score is numeric
-        if (parsed.impact_score) parsed.impact_score = Number(parsed.impact_score);
+        parsed.impact_score = Number(parsed.impact_score) || 5;
+        
         return parsed;
       } catch (parseError) {
         // Fallback: try to find JSON block
@@ -61,7 +87,13 @@ JSON Structure:
         if (jsonMatch) {
           try {
             const parsed = JSON.parse(jsonMatch[0]);
-            if (parsed.impact_score) parsed.impact_score = Number(parsed.impact_score);
+            // Normalize sentiment
+            if (parsed.sentiment) {
+                const s = parsed.sentiment.toLowerCase();
+                if (s.includes('pos')) parsed.sentiment = 'Positive';
+                else if (s.includes('neg')) parsed.sentiment = 'Negative';
+                else parsed.sentiment = 'Neutral';
+            }
             return parsed;
           } catch (innerError) {
              logger.error('Failed to parse matched JSON block:', innerError);
@@ -71,7 +103,7 @@ JSON Structure:
       }
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 429) {
-        throw new Error('RATE_LIMIT'); // Specialized error for pipeline to handle
+        throw new Error('RATE_LIMIT'); 
       }
       logger.error('Groq AI Processing Error:', error instanceof Error ? error.message : error);
       throw new Error('AI_PROCESSING_FAILED');

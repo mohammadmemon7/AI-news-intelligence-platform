@@ -103,10 +103,9 @@ export const pipelineService = {
   },
 
   processAllUnprocessed: async () => {
-    const batchSize = 10; // Increased batch size
+    const batchSize = 5; 
     const delayBetweenBatches = 1000;
 
-    // Find all that need processing
     const allUnprocessed = await Article.find({ ai_processed: false }).select('_id');
     totalToProcess = allUnprocessed.length;
     
@@ -117,14 +116,12 @@ export const pipelineService = {
     while (unprocessed.length > 0) {
       logger.info(`Processing batch of ${unprocessed.length} articles... (${processedCount}/${totalToProcess})`);
 
-      // Process in parallel within the batch to speed up, but still manageable
-      await Promise.all(unprocessed.map(article => pipelineService.enrichArticle(article)));
-      
-      processedCount += unprocessed.length;
+      for (const article of unprocessed) {
+        await pipelineService.enrichArticle(article);
+        processedCount++;
+      }
 
-      // Rate limit protection
       await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
-      
       unprocessed = await Article.find({ ai_processed: false }).limit(batchSize);
     }
   },
