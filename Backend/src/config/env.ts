@@ -25,11 +25,14 @@ const envSchema = z.object({
   PIPELINE_SECRET: z.string().min(1).default('secret'),
 });
 
-const envParse = envSchema.safeParse(process.env);
-
-if (!envParse.success) {
-  console.error('❌ Invalid environment variables:', JSON.stringify(envParse.error.format(), null, 2));
+// Using .parse() instead of .safeParse() to ensure the returned data is fully typed 
+// and non-nullable. It will throw if validation fails.
+let validatedEnv;
+try {
+  validatedEnv = envSchema.parse(process.env);
+} catch (error: any) {
+  console.error('❌ Invalid environment variables:', JSON.stringify(error.format ? error.format() : error, null, 2));
   process.exit(1);
 }
 
-export const env = envParse.data;
+export const env = validatedEnv;
