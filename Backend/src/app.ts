@@ -42,9 +42,9 @@ app.get('/health', (req, res) => {
 // 1. Helmet – security headers
 app.use(helmet());
 
-// 2. CORS – explicit origin
+// 2. CORS – allow all for diagnostics
 app.use(cors({
-  origin: env!.CLIENT_URL,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 
