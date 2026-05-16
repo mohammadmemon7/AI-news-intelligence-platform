@@ -13,9 +13,12 @@ export interface IArticle extends Document {
   dedup_hash: string;
   ai_summary?: string;
   ai_sentiment?: 'Positive' | 'Negative' | 'Neutral';
+  ai_impact_score?: number;
   ai_insights: string[];
   ai_processed: boolean;
   ai_failed: boolean;
+  ai_error_message?: string;
+  ai_retry_count: number;
   fetched_at: Date;
 }
 
@@ -32,14 +35,16 @@ const articleSchema = new Schema<IArticle>({
   dedup_hash: { type: String, required: true, unique: true },
   ai_summary: { type: String },
   ai_sentiment: { type: String, enum: ['Positive', 'Negative', 'Neutral'] },
+  ai_impact_score: { type: Number },
   ai_insights: [{ type: String }],
   ai_processed: { type: Boolean, default: false },
   ai_failed: { type: Boolean, default: false },
+  ai_error_message: { type: String },
+  ai_retry_count: { type: Number, default: 0 },
   fetched_at: { type: Date, default: Date.now },
 });
 
-// Indexes as per rules section 9
-articleSchema.index({ title: 'text', description: 'text' }); // full-text search
+articleSchema.index({ title: 'text', description: 'text' });
 articleSchema.index({ published_at: -1 });
 articleSchema.index({ ai_sentiment: 1 });
 articleSchema.index({ ai_processed: 1 });

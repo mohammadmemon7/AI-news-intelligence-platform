@@ -15,7 +15,7 @@ console.log(`[ENV] NEWS_API_KEY loaded: ${process.env.NEWS_API_KEY?.slice(0, 8)}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
-  PORT: z.string().transform(Number).default('5000'),
+  PORT: z.string().default('5000').transform(Number),
   MONGODB_URI: z.string().min(10), 
   NEWS_API_KEY: z.string().min(1),
   GROQ_API_KEY: z.string().min(1),

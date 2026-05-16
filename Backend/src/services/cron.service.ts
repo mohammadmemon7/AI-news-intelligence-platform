@@ -13,8 +13,8 @@ export const cronService = {
       return;
     }
 
-    // Every 6 hours: '0 */6 * * *'
-    cron.schedule('0 */6 * * *', async () => {
+    // Every 1 hour: '0 * * * *'
+    cron.schedule('0 * * * *', async () => {
       logger.info('Running scheduled news refresh...');
       try {
         await pipelineService.run();
@@ -23,6 +23,10 @@ export const cronService = {
       }
     });
 
-    logger.info('Cron jobs scheduled: News refresh every 6 hours.');
+    // Run once immediately on start (Disabled to save credits for demo)
+    // logger.info('Triggering initial news refresh...');
+    // pipelineService.run().catch(err => logger.error('Initial Pipeline Error:', err));
+
+    logger.info('Cron jobs scheduled: News refresh every 1 hour.');
   }
 };

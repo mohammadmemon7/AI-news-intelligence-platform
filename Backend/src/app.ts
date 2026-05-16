@@ -42,9 +42,9 @@ app.get('/health', (req, res) => {
 // 1. Helmet – security headers
 app.use(helmet());
 
-// 2. CORS – explicit origin
+// 2. CORS – allow all for local dev
 app.use(cors({
-  origin: env.CLIENT_URL,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 
@@ -55,8 +55,8 @@ app.use(express.json({ limit: '10kb' }));
 app.use(sanitizeMiddleware);
 
 // 5. Rate Limiting
-app.use('/api', globalLimiter);
-app.post('/api/pipeline/run', pipelineLimiter, pipelineController.runPipeline);
+// app.use('/api', globalLimiter);
+app.post('/api/pipeline/run', pipelineController.runPipeline);
 app.get('/api/pipeline/status', pipelineController.getStatus);
 app.post('/api/pipeline/process/:id', pipelineController.processArticle);
 

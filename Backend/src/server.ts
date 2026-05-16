@@ -9,8 +9,8 @@ const startServer = async () => {
     // 1. Connect to Database
     await connectDB();
 
-    // 2. Start Cron Jobs (optional, disabled by default)
-    cronService.init(false);
+    // 2. Start Cron Jobs (Enabled)
+    cronService.init(true);
 
     // 3. Start Listening
     app.listen(env.PORT, () => {

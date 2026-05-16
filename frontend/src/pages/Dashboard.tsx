@@ -77,9 +77,16 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
   }, [fetchStats]);
 
   const handleRefresh = async () => {
+    console.log('Refresh Feed Button Clicked!');
     try {
       setRefreshing(true);
-      await runPipeline(); // sends POST /api/pipeline/run → gets 202 Accepted
+      const res = await runPipeline(); 
+      console.log('Pipeline run response:', res);
+      
+      // If already running, we still want to poll until it finishes
+      if (res && (res as any).data?.message?.includes('Already running')) {
+          console.log('Pipeline is already active, starting polling...');
+      }
 
       // Poll /api/pipeline/status every 3s until the pipeline finishes,
       // then refetch articles and stats so the UI shows genuinely new data.
@@ -90,8 +97,13 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
           await new Promise(resolve => setTimeout(resolve, 3000));
           try {
             const status = await getPipelineStatus();
-            if (!status.data?.isRunning) break; // pipeline finished
-          } catch { break; } // if status endpoint fails, proceed anyway
+            if (!status.data?.isRunning) {
+              if (status.data?.lastRunStatus?.rateLimited) {
+                setError('News source rate limit reached. Using existing articles for now. Please wait 15 minutes.');
+              }
+              break; // pipeline finished
+            }
+          } catch { break; } 
           polls++;
         }
         // Refetch only after pipeline is done (or timed out)
@@ -106,6 +118,33 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    const checkInitialStatus = async () => {
+      try {
+        const res = await getPipelineStatus();
+        if (res.data?.isRunning) {
+          setRefreshing(true);
+          // Start polling, but DON'T trigger a new run
+          const pollUntilDone = async () => {
+            const MAX_POLLS = 60;
+            let polls = 0;
+            while (polls < MAX_POLLS) {
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              const status = await getPipelineStatus();
+              if (!status.data?.isRunning) break;
+              polls++;
+            }
+            fetchArticles();
+            fetchStats();
+            setRefreshing(false);
+          };
+          pollUntilDone();
+        }
+      } catch (err) { /* ignore */ }
+    };
+    checkInitialStatus();
+  }, []);
 
   const handleSearch = useCallback((search: string) => {
     setFilters(prev => {

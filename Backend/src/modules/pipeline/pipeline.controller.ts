@@ -5,19 +5,18 @@ import { logger } from '../../utils/logger';
 
 export const runPipeline = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const secret = req.headers['x-pipeline-secret'];
+    logger.info(`[API] Pipeline run requested from IP: ${req.ip}`);
     
-    if (secret !== env.PIPELINE_SECRET) {
-      logger.warn(`Unauthorized pipeline trigger attempt from IP: ${req.ip}`);
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Invalid pipeline secret',
-        },
+    // Check if already running to give immediate feedback
+    const status = pipelineService.getStatus();
+    if (status.isRunning) {
+      return res.status(200).json({
+        success: true,
+        data: { message: 'Pipeline is already running in the background.' },
       });
     }
 
+    // Fire and forget
     pipelineService.run().catch(err => {
         logger.error('Background pipeline error:', err);
     });
