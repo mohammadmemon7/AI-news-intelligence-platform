@@ -35,7 +35,11 @@ const articleSchema = new Schema<IArticle>({
   dedup_hash: { type: String, required: true, unique: true },
   ai_summary: { type: String },
   ai_sentiment: { type: String, enum: ['Positive', 'Negative', 'Neutral'] },
+<<<<<<< HEAD
   ai_impact_score: { type: Number },
+=======
+  ai_impact_score: { type: Number, min: 1, max: 10 },
+>>>>>>> 4708b866a888bb780857c6eab811f4df5a17bdf8
   ai_insights: [{ type: String }],
   ai_processed: { type: Boolean, default: false },
   ai_failed: { type: Boolean, default: false },

@@ -36,13 +36,16 @@ const sanitizeMiddleware = (req: express.Request, res: express.Response, next: e
 
 // Health check mounted before global rate limiter
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ 
+    status: 'ok',
+    secret_hint: env!.PIPELINE_SECRET ? `${env!.PIPELINE_SECRET.slice(0, 3)}...` : 'missing'
+  });
 });
 
 // 1. Helmet – security headers
 app.use(helmet());
 
-// 2. CORS – allow all for local dev
+// 2. CORS – allow all for local dev & diagnostics
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -61,7 +64,7 @@ app.get('/api/pipeline/status', pipelineController.getStatus);
 app.post('/api/pipeline/process/:id', pipelineController.processArticle);
 
 // 6. Logging
-if (env.NODE_ENV === 'development') {
+if (env!.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 

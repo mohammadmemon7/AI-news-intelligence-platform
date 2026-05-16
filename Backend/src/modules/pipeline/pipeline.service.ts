@@ -19,8 +19,8 @@ let lastRunStatus: {
 export const pipelineService = {
   run: async () => {
     if (isRunning) {
-      logger.info('Pipeline is already running. Skipping request.');
-      return { message: 'Already running' };
+      logger.warn('Pipeline is already running. Skipping request.');
+      return { message: 'Already running', isRunning, processedCount };
     }
 
     isRunning = true;
@@ -187,7 +187,7 @@ export const pipelineService = {
           lastRunStatus.success = true;
           lastRunStatus.articlesFetched = articlesFetched;
       }
-      return { articlesFetched };
+      return { articlesFetched, processedCount };
       
     } catch (error) {
       logger.error('Pipeline Error:', error instanceof Error ? error.message : error);
@@ -201,7 +201,7 @@ export const pipelineService = {
       } catch (procErr) {
         logger.error('Background processing error:', procErr);
       }
-      throw error;
+      return { articlesFetched, processedCount };
     } finally {
         isRunning = false;
     }
@@ -363,7 +363,17 @@ export const pipelineService = {
     logger.info(`Enriching article ${article._id}...`);
     
     try {
-      const textToAnalyze = `${article.title}\n\n${article.description || article.content}`;
+      const textToAnalyze = `${article.title}\n\n${article.description || article.content || ''}`;
+      
+      // Basic validation for demo
+      if (textToAnalyze.trim().length < 30) {
+          article.ai_processed = true;
+          article.ai_failed = true;
+          article.ai_error_message = 'Content too short for analysis';
+          await article.save();
+          return;
+      }
+
       const analysis = await aiService.processArticle(textToAnalyze);
       
       article.ai_summary = analysis.summary;
@@ -402,6 +412,11 @@ export const pipelineService = {
   processSingleArticle: async (id: string) => {
     const article = await Article.findById(id);
     if (!article) throw new Error('Article not found');
+    
+    // Reset state for re-processing
+    article.ai_failed = false;
+    article.ai_processed = false;
+    
     return await pipelineService.enrichArticle(article);
   },
 

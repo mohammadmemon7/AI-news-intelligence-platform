@@ -88,10 +88,9 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
           console.log('Pipeline is already active, starting polling...');
       }
 
-      // Poll /api/pipeline/status every 3s until the pipeline finishes,
-      // then refetch articles and stats so the UI shows genuinely new data.
+      // Poll /api/pipeline/status every 3s
       const pollUntilDone = async () => {
-        const MAX_POLLS = 60; // give up after 3 minutes
+        const MAX_POLLS = 100; 
         let polls = 0;
         while (polls < MAX_POLLS) {
           await new Promise(resolve => setTimeout(resolve, 3000));
@@ -103,18 +102,18 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
               }
               break; // pipeline finished
             }
-          } catch { break; } 
           polls++;
         }
-        // Refetch only after pipeline is done (or timed out)
         fetchArticles();
         fetchStats();
         setRefreshing(false);
       };
 
-      pollUntilDone(); // run in background — don't await so UI stays responsive
-    } catch (err) {
+      pollUntilDone();
+    } catch (err: any) {
       console.error('Pipeline error:', err);
+      const msg = err.response?.data?.error?.message || err.message || 'Pipeline failed to start.';
+      setError(`Pipeline Error: ${msg}. Check if your PIPELINE_SECRET is correct on both Render and Vercel.`);
       setRefreshing(false);
     }
   };

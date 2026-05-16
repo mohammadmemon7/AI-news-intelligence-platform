@@ -25,7 +25,7 @@ export const getStats = async (): Promise<StatsResponse> => {
 export const runPipeline = async (): Promise<{ success: boolean; message: string }> => {
   const { data } = await api.post('/pipeline/run', {}, {
     headers: {
-      'x-pipeline-secret': import.meta.env.VITE_PIPELINE_SECRET
+      'x-pipeline-secret': 'datastraw123'
     }
   });
   return data;
@@ -39,7 +39,7 @@ export const getPipelineStatus = async (): Promise<{ success: boolean; data: any
 export const processArticle = async (id: string): Promise<{ success: boolean; data: any }> => {
   const { data } = await api.post(`/pipeline/process/${id}`, {}, {
     headers: {
-      'x-pipeline-secret': import.meta.env.VITE_PIPELINE_SECRET
+      'x-pipeline-secret': 'datastraw123'
     }
   });
   return data;

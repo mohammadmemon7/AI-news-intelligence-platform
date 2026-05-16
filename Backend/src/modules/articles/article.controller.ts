@@ -19,7 +19,7 @@ export const getArticles = async (req: Request, res: Response, next: NextFunctio
 export const getArticleById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const article = await articleService.getArticleById(id);
+    const article = await articleService.getArticleById(id as string);
 
     if (!article) {
       return res.status(404).json({

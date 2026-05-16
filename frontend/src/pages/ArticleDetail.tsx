@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { 
   ChevronLeft, 
   Globe, 
   BrainCircuit, 
   Calendar, 
-  Hash, 
   ExternalLink, 
   Share2, 
-  Bookmark,
   CheckCircle2,
   TrendingUp,
   TrendingDown,
@@ -121,6 +119,12 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ isDark, toggleTheme }) =>
                 {sentiment.icon}
                 {sentiment.label} AI Analysis
               </div>
+              {article.ai_impact_score && (
+                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border shadow-sm bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
+                  <BrainCircuit size={14} className="text-blue-500" />
+                  Impact Score: {article.ai_impact_score}/10
+                </div>
+              )}
               <div className="flex items-center gap-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 <Calendar size={14} className="text-blue-500" />
                 {format(new Date(article.published_at), 'MMMM dd, yyyy • HH:mm')}

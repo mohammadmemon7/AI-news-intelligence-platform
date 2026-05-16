@@ -5,6 +5,20 @@ import { logger } from '../../utils/logger';
 
 export const runPipeline = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const secret = (req.headers['x-pipeline-secret'] as string)?.trim();
+    const expectedSecret = env!.PIPELINE_SECRET?.trim();
+    
+    if (secret !== expectedSecret) {
+      logger.warn(`Unauthorized pipeline trigger attempt from IP: ${req.ip}. Expected start: ${expectedSecret.slice(0, 3)}...`);
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid pipeline secret',
+        },
+      });
+    }
+
     logger.info(`[API] Pipeline run requested from IP: ${req.ip}`);
     
     // Check if already running to give immediate feedback
@@ -34,8 +48,11 @@ export const runPipeline = async (req: Request, res: Response, next: NextFunctio
 
 export const processArticle = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const secret = req.headers['x-pipeline-secret'];
-    if (!secret || secret !== env.PIPELINE_SECRET) {
+    const secret = (req.headers['x-pipeline-secret'] as string)?.trim();
+    const expectedSecret = env!.PIPELINE_SECRET?.trim();
+
+    if (!secret || secret !== expectedSecret) {
+      logger.warn(`Pipeline trigger denied: Secret mismatch. Expected start: ${expectedSecret.slice(0, 3)}...`);
       return res.status(401).json({
         success: false,
         error: {
@@ -46,7 +63,7 @@ export const processArticle = async (req: Request, res: Response, next: NextFunc
     }
 
     const { id } = req.params;
-    const article = await pipelineService.processSingleArticle(id);
+    const article = await pipelineService.processSingleArticle(id as string);
     
     res.status(200).json({
       success: true,

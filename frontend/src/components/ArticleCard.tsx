@@ -9,7 +9,8 @@ import {
   RotateCcw,
   CheckCircle2,
   BrainCircuit,
-  Globe
+  Globe,
+  AlertTriangle
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Article } from '../types/article';
@@ -45,6 +46,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article: initialArticle }) =>
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
 
   // Ref for measuring the insights list height for smooth animation
   const insightsRef = useRef<HTMLDivElement>(null);
@@ -80,14 +82,18 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article: initialArticle }) =>
   const handleReprocess = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setProcessError(null);
     try {
       setIsProcessing(true);
       const res = await processArticle(article._id);
       if (res.success) {
         setArticle(res.data);
+      } else {
+        setProcessError('Analysis failed. Try again.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to re-process:', err);
+      setProcessError(err.response?.data?.error?.message || 'Connection error.');
     } finally {
       setIsProcessing(false);
     }
@@ -140,12 +146,17 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article: initialArticle }) =>
 
         {/* AI Content Section */}
         <div className="space-y-4">
-          {article.ai_processed ? (
+          {article.ai_processed && !article.ai_failed ? (
             <>
               <div className="flex items-center gap-2 mb-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-tighter ${getSentimentColor(article.ai_sentiment)}`}>
                   {article.ai_sentiment || 'Neutral'}
                 </span>
+                {article.ai_impact_score && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 uppercase tracking-tighter">
+                    Impact: {article.ai_impact_score}/10
+                  </span>
+                )}
                 {article.ai_sentiment === 'Positive' && <span className="text-xs">🚀</span>}
                 {article.ai_sentiment === 'Negative' && <span className="text-xs">⚠️</span>}
               </div>
@@ -222,22 +233,27 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article: initialArticle }) =>
               )}
             </>
           ) : (
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center space-y-3">
-              <div className="p-2 bg-white dark:bg-slate-700 rounded-full text-slate-400 animate-pulse">
-                <BrainCircuit size={24} />
+            <div className={`rounded-2xl p-4 border flex flex-col items-center text-center space-y-3 ${article.ai_failed ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
+              <div className={`p-2 rounded-full animate-pulse ${article.ai_failed ? 'bg-white dark:bg-rose-900/30 text-rose-500' : 'bg-white dark:bg-slate-700 text-slate-400'}`}>
+                {article.ai_failed ? <AlertTriangle size={24} /> : <BrainCircuit size={24} />}
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">AI Analysis Pending</p>
-                <p className="text-[11px] text-slate-500">Insights will be available shortly.</p>
+                <p className={`text-xs font-bold uppercase tracking-wider ${article.ai_failed ? 'text-rose-900 dark:text-rose-100' : 'text-slate-900 dark:text-slate-100'}`}>
+                  {article.ai_failed ? 'AI Analysis Failed' : 'AI Analysis Pending'}
+                </p>
+                <p className={`text-[11px] ${article.ai_failed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500'}`}>
+                  {article.ai_failed ? (article.ai_error_message || 'Click below to try again.') : 'Insights will be available shortly.'}
+                </p>
               </div>
               <button
                 onClick={handleReprocess}
                 disabled={isProcessing}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all disabled:opacity-50"
+                className={`flex items-center gap-2 px-4 py-2 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${article.ai_failed ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'}`}
               >
                 <RotateCcw size={12} className={isProcessing ? 'animate-spin' : ''} />
-                {isProcessing ? 'Processing...' : 'RE-PROCESS NOW'}
+                {isProcessing ? 'Processing...' : (article.ai_failed ? 'RETRY ANALYSIS' : 'RE-PROCESS NOW')}
               </button>
+              {processError && <p className="text-[10px] text-rose-500 font-bold">{processError}</p>}
             </div>
           )}
         </div>

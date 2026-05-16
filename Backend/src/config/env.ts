@@ -2,34 +2,37 @@ import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Always resolve .env relative to the Backend root, regardless of cwd
-// Works for both CommonJS (ts-node-dev) and ESM
-const envPath = path.resolve(__dirname, '../../.env');
-const result = dotenv.config({ path: envPath });
-if (result.error) {
-  // Fallback: try cwd (in case __dirname doesn't resolve as expected)
-  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-}
-console.log(`[ENV] Loading .env from: ${envPath}`);
-console.log(`[ENV] NEWS_API_KEY loaded: ${process.env.NEWS_API_KEY?.slice(0, 8)}...`);
+const loadEnv = () => {
+  // Always resolve .env relative to the Backend root, regardless of cwd
+  const envPath = path.resolve(__dirname, '../../.env');
+  const result = dotenv.config({ path: envPath });
+  
+  if (result.error) {
+    // Fallback: try cwd
+    dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+  }
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production']).default('development'),
-  PORT: z.string().default('5000').transform(Number),
-  MONGODB_URI: z.string().min(10), 
-  NEWS_API_KEY: z.string().min(1),
-  GROQ_API_KEY: z.string().min(1),
-  GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
-  GROQ_BASE_URL: z.string().url().default('https://api.groq.com/openai/v1'),
-  CLIENT_URL: z.string().url(),
-  PIPELINE_SECRET: z.string().min(1).default('secret'),
-});
+  const envSchema = z.object({
+    NODE_ENV: z.enum(['development', 'production']).default('development'),
+    PORT: z.string().default('5000').transform(Number),
+    MONGODB_URI: z.string().min(10), 
+    NEWS_API_KEY: z.string().min(1),
+    GROQ_API_KEY: z.string().min(1),
+    GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
+    GROQ_BASE_URL: z.string().url().default('https://api.groq.com/openai/v1'),
+    CLIENT_URL: z.string().url(),
+    PIPELINE_SECRET: z.string().min(1).default('secret'),
+  });
 
-const envParse = envSchema.safeParse(process.env);
+  try {
+    const parsed = envSchema.parse(process.env);
+    console.log(`[ENV] Using AI Model: ${parsed.GROQ_MODEL}`);
+    return parsed;
+  } catch (error: any) {
+    console.error('❌ Invalid environment variables:', JSON.stringify(error.format ? error.format() : error, null, 2));
+    process.exit(1);
+    throw error; // unreachable but satisfies TS
+  }
+};
 
-if (!envParse.success) {
-  console.error('❌ Invalid environment variables:', JSON.stringify(envParse.error.format(), null, 2));
-  process.exit(1);
-}
-
-export const env = envParse.data;
+export const env = loadEnv()!;

@@ -10,8 +10,11 @@ export interface Article {
   country?: string[];
   ai_summary?: string;
   ai_sentiment?: 'Positive' | 'Negative' | 'Neutral';
+  ai_impact_score?: number;
   ai_insights?: string[];
   ai_processed: boolean;
+  ai_failed?: boolean;
+  ai_error_message?: string;
   fetched_at: string;
 }
 
