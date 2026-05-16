@@ -102,6 +102,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isDark, toggleTheme }) => {
               }
               break; // pipeline finished
             }
+          } catch { break; } 
           polls++;
         }
         fetchArticles();
